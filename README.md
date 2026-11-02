@@ -107,7 +107,7 @@ docker compose down -v
 
 ## Запуск без Docker
 
-Понадобятся [uv](https://docs.astral.sh/uv/getting-started/installation/), [GDAL и GEOS](https://docs.djangoproject.com/en/5.2/ref/contrib/gis/install/geolibs/) и PostgreSQL с PostGIS. Этот способ не проверялся на Windows.
+Понадобятся [uv](https://docs.astral.sh/uv/getting-started/installation/) (`pip install uv`), [GDAL и GEOS](https://docs.djangoproject.com/en/5.2/ref/contrib/gis/install/geolibs/) и PostgreSQL с PostGIS. Этот способ не проверялся на Windows.
 
 Установить зависимости:
 
