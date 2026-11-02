@@ -7,7 +7,7 @@ Backend платформы обмена вещами и вторичного и�
 ## Что нужно установить
 
 - [Python](https://www.python.org/downloads/) 3.13 или новее
-- [uv](https://docs.astral.sh/uv/getting-started/installation/) (можно через `pip install uv`)
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) (`pip install uv`)
 - [Docker](https://www.docker.com/products/docker-desktop/)
 
 ## Установка
