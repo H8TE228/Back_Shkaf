@@ -1,9 +1,14 @@
 from django.contrib.auth import get_user_model
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
+from rest_framework_simplejwt.token_blacklist.models import (
+    BlacklistedToken,
+    OutstandingToken,
+)
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
+from .permissions import IsSelfOrAdmin
 from .serializers import (
     ChangePasswordSerializer,
     CustomTokenObtainPairSerializer,
@@ -24,27 +29,28 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = (permissions.AllowAny,)
     serializer_class = RegisterSerializer
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        refresh = RefreshToken.for_user(user)
-        return Response(
-            {
-                'user': UserSerializer(user).data,
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            },
-            status=status.HTTP_201_CREATED
-        )
+
+class AccountDeletionMixin:
+    def perform_destroy(self, instance):
+        for token in OutstandingToken.objects.filter(user=instance):
+            BlacklistedToken.objects.get_or_create(token=token)
+        instance.anonymize()
 
 
-class UserProfileView(generics.RetrieveUpdateAPIView):
+class MeView(AccountDeletionMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = UserSerializer
     permission_classes = (permissions.IsAuthenticated,)
+    http_method_names = ['get', 'patch', 'delete', 'head', 'options']
 
     def get_object(self):
         return self.request.user
+
+
+class UserDetailView(AccountDeletionMixin, generics.UpdateAPIView, generics.DestroyAPIView):
+    queryset = User.objects.filter(deleted_at__isnull=True)
+    serializer_class = UserSerializer
+    permission_classes = (permissions.IsAuthenticated, IsSelfOrAdmin,)
+    http_method_names = ['patch', 'delete', 'head', 'options']
 
 
 class ChangePasswordView(generics.UpdateAPIView):
@@ -69,7 +75,7 @@ class ChangePasswordView(generics.UpdateAPIView):
     
 
 class UserListView(generics.ListAPIView):
-    queryset = User.objects.all()
+    queryset = User.objects.filter(deleted_at__isnull=True)
     serializer_class = UserSerializer
     permission_classes = (permissions.IsAdminUser,)
 
@@ -91,7 +97,7 @@ class LogoutView(generics.GenericAPIView):
             token = RefreshToken(refresh_token)
             token.blacklist()
             return Response(status=status.HTTP_205_RESET_CONTENT)
-        except Exception as e:
+        except Exception:
             return Response(
                 {"error": "Invalid token"}, 
                 status=status.HTTP_400_BAD_REQUEST
