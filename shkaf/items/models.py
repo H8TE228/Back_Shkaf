@@ -1,9 +1,17 @@
+from pathlib import Path
+from uuid import uuid4
+
 from django.conf import settings
 from django.contrib.gis.db import models as gis_models
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from shkaf.geo import round_point
+
+
+def item_photo_path(instance, filename):
+    """В адрес файла не попадает исходное имя: оно может содержать личные данные."""
+    return f'items/{uuid4().hex}{Path(filename).suffix.lower()}'
 
 
 class ItemType(models.Model):
@@ -79,7 +87,7 @@ class Item(models.Model):
 
 class ItemPhoto(models.Model):
     item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='photos', verbose_name=_('item'))
-    image = models.ImageField(_('image'), upload_to='items/')
+    image = models.ImageField(_('image'), upload_to=item_photo_path)
     position = models.PositiveSmallIntegerField(_('position'), default=0)
 
     class Meta:
