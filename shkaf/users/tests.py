@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import Point
 from django.db import IntegrityError, transaction
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -61,32 +62,105 @@ class AuthTests(APITestCase):
 
     def login(self):
         return self.client.post(
-            '/api/v1/users/auth', {'email': self.user.email, 'password': PASSWORD}
+            '/api/v1/users/login', {'email': self.user.email, 'password': PASSWORD}
         )
 
-    def test_login_returns_tokens(self):
+    def test_login_sets_http_only_cookies(self):
         response = self.login()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(set(response.data), {'access', 'refresh'})
+
+        access = response.cookies['access_token']
+        refresh = response.cookies['refresh_token']
+        for cookie in (access, refresh):
+            self.assertTrue(cookie['httponly'])
+            self.assertEqual(cookie['samesite'], 'Lax')
+        self.assertEqual(access['path'], '/')
+        self.assertEqual(refresh['path'], '/api/v1/users/')
+
+    def test_tokens_are_not_in_response_body(self):
+        response = self.login()
+        self.assertNotIn('access', response.data)
+        self.assertNotIn('refresh', response.data)
+        self.assertEqual(response.data['email'], self.user.email)
+
+    def test_secure_flag_follows_setting(self):
+        for value in (True, False):
+            with override_settings(AUTH_COOKIE_SECURE=value):
+                response = self.login()
+                self.assertEqual(bool(response.cookies['access_token']['secure']), value)
+                self.assertEqual(bool(response.cookies['refresh_token']['secure']), value)
+
+    def test_old_auth_url_is_removed(self):
+        response = self.client.post(
+            '/api/v1/users/auth', {'email': self.user.email, 'password': PASSWORD}
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_wrong_password(self):
         response = self.client.post(
-            '/api/v1/users/auth', {'email': self.user.email, 'password': 'wrong'}
+            '/api/v1/users/login', {'email': self.user.email, 'password': 'wrong'}
         )
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertNotIn('access_token', response.cookies)
 
-    def test_refresh_and_logout(self):
-        tokens = self.login().data
-        response = self.client.post('/api/v1/users/auth/refresh', {'refresh': tokens['refresh']})
+    def test_me_works_with_cookie(self):
+        self.assertEqual(self.client.get('/api/v1/me').status_code, status.HTTP_401_UNAUTHORIZED)
+        self.login()
+        response = self.client.get('/api/v1/me')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['email'], self.user.email)
 
-        refresh = response.data['refresh']
-        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {response.data['access']}")
-        response = self.client.post('/api/v1/users/logout', {'refresh': refresh})
-        self.assertEqual(response.status_code, status.HTTP_205_RESET_CONTENT)
+    def test_bearer_header_is_not_accepted(self):
+        access = self.login().cookies['access_token'].value
+        self.client.cookies.clear()
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+        self.assertEqual(self.client.get('/api/v1/me').status_code, status.HTTP_401_UNAUTHORIZED)
 
-        response = self.client.post('/api/v1/users/auth/refresh', {'refresh': refresh})
+    def test_invalid_access_cookie(self):
+        self.client.cookies['access_token'] = 'broken'
+        self.assertEqual(self.client.get('/api/v1/me').status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(self.client.get('/api/v1/schema/').status_code, status.HTTP_200_OK)
+        self.assertEqual(self.login().status_code, status.HTTP_200_OK)
+
+    def test_refresh_rotates_cookies(self):
+        old = self.login().cookies['refresh_token'].value
+        response = self.client.post('/api/v1/users/login/refresh')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn('access', response.data)
+        self.assertNotEqual(response.cookies['refresh_token'].value, old)
+        self.assertEqual(self.client.get('/api/v1/me').status_code, status.HTTP_200_OK)
+
+        self.client.cookies['refresh_token'] = old
+        response = self.client.post('/api/v1/users/login/refresh')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_refresh_without_cookie(self):
+        response = self.client.post('/api/v1/users/login/refresh')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_logout_revokes_token_and_clears_cookies(self):
+        refresh = self.login().cookies['refresh_token'].value
+        response = self.client.post('/api/v1/users/logout')
+        self.assertEqual(response.status_code, status.HTTP_205_RESET_CONTENT)
+        self.assertEqual(response.cookies['access_token'].value, '')
+        self.assertEqual(response.cookies['refresh_token'].value, '')
+        self.assertEqual(response.cookies['refresh_token']['path'], '/api/v1/users/')
+        self.assertEqual(self.client.get('/api/v1/me').status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.client.cookies['refresh_token'] = refresh
+        response = self.client.post('/api/v1/users/login/refresh')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_logout_without_access_token(self):
+        self.login()
+        del self.client.cookies['access_token']
+        self.assertEqual(self.client.post('/api/v1/users/logout').status_code, status.HTTP_205_RESET_CONTENT)
+
+    def test_logout_with_invalid_refresh_cookie(self):
+        self.client.cookies['refresh_token'] = 'broken'
+        response = self.client.post('/api/v1/users/logout')
+        self.assertEqual(response.status_code, status.HTTP_205_RESET_CONTENT)
+        self.assertEqual(response.cookies['refresh_token'].value, '')
 
 
 class MeTests(APITestCase):
@@ -124,13 +198,14 @@ class MeTests(APITestCase):
 
     def test_delete_anonymizes_account(self):
         self.client.force_authenticate(None)
-        tokens = self.client.post(
-            '/api/v1/users/auth', {'email': self.user.email, 'password': PASSWORD}
-        ).data
-        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        refresh = self.client.post(
+            '/api/v1/users/login', {'email': self.user.email, 'password': PASSWORD}
+        ).cookies['refresh_token'].value
 
         response = self.client.delete(self.url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.cookies['access_token'].value, '')
+        self.assertEqual(response.cookies['refresh_token'].value, '')
 
         self.user.refresh_from_db()
         self.assertFalse(self.user.is_active)
@@ -138,12 +213,12 @@ class MeTests(APITestCase):
         self.assertNotIn('user@example.test', self.user.email)
 
         self.assertEqual(self.client.get(self.url).status_code, status.HTTP_401_UNAUTHORIZED)
-        self.client.credentials()
         response = self.client.post(
-            '/api/v1/users/auth', {'email': 'user@example.test', 'password': PASSWORD}
+            '/api/v1/users/login', {'email': 'user@example.test', 'password': PASSWORD}
         )
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        response = self.client.post('/api/v1/users/auth/refresh', {'refresh': tokens['refresh']})
+        self.client.cookies['refresh_token'] = refresh
+        response = self.client.post('/api/v1/users/login/refresh')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_change_password(self):
@@ -177,7 +252,9 @@ class UserDetailTests(APITestCase):
     def test_admin_can_delete(self):
         admin = make_user(email='admin@example.test', username='admin', is_staff=True)
         self.client.force_authenticate(admin)
-        self.assertEqual(self.client.delete(self.url).status_code, status.HTTP_204_NO_CONTENT)
+        response = self.client.delete(self.url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertNotIn('access_token', response.cookies)
         self.assertEqual(self.client.patch(self.url, {'city': 'X'}).status_code, status.HTTP_404_NOT_FOUND)
 
     def test_user_list_is_admin_only(self):
