@@ -82,7 +82,3 @@ class ChangePasswordSerializer(serializers.Serializer):
         instance.set_password(validated_data['new_password'])
         instance.save()
         return instance
-
-
-class LogoutSerializer(serializers.Serializer):
-    refresh = serializers.CharField(help_text='Refresh JWT token for adding to blacklist')
