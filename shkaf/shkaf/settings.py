@@ -38,6 +38,7 @@ ALLOWED_HOSTS = []
 CORS_ALLOWED_ORIGINS = [
     origin for origin in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if origin
 ]
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 # Нужны только при запуске без Docker, если GDAL и GEOS не находятся автоматически

@@ -155,6 +155,19 @@ uv run python manage.py runserver
 | DELETE | `/items/{id}/photos/{photo_id}` | Удаление фото | Владелец |
 | GET | `/itemTypes`, `/itemTypes/{id}` | Справочник типов вещей | Все |
 
+| GET | `/exchange-points`, `/exchange-points/{id}` | Каталог и карточка пункта обмена | Все |
+| POST | `/exchange-points` | Создание пункта с адресом | `is_staff` |
+| PATCH | `/exchange-points/{id}` | Изменение пункта и адреса | `is_staff` |
+
+### Пункты обмена
+
+- В каталоге видны все статусы: `active`, `needs_check`, `closed`. По умолчанию новый пункт получает статус `needs_check`.
+- Фильтры: `city`, `district`, `status`, `exchange_format` (`free`, `points`, `charity`); `search` ищет по названию.
+- При создании передаётся объект `address` с полями `city`, `street`, `building`, `latitude`, `longitude` и необязательными полями адреса. При изменении координат нужно передать обе координаты.
+- `opening_hours` — объект с днями `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`. Пустой объект означает неизвестное расписание, отсутствующий день — нет данных о нём, пустой список — выходной. Переданное при `PATCH` расписание заменяет прежнее целиком.
+- Интервалы записываются как `{"from": "10:00", "to": "18:00"}`. `24:00` допустимо только как время окончания; ночную работу нужно разделить между днями. Интервалы одного дня не должны пересекаться.
+- `verified_at`, `verified_by` и `picture` доступны только для чтения. Загрузка изображения через API пока не реализована.
+
 ### Объявления
 
 - **Фильтры `/items` и `/me/items`:** `item_type`, `exchange_format`, `condition`, `status`, `district`.
