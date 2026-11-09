@@ -1,12 +1,18 @@
+from io import StringIO
+
 from django.contrib.auth import get_user_model
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
+from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
 from django.test import TestCase
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+
+from items.models import ItemType
 
 from .models import Address, ExchangePoint
 
@@ -74,7 +80,7 @@ class ExchangePointModelTests(TestCase):
 
 
 class ExchangePointApiTests(APITestCase):
-    url = '/api/v1/exchange-points'
+    url = '/api/v1/exchangePoints'
 
     def setUp(self):
         self.staff = get_user_model().objects.create_user(
@@ -208,3 +214,126 @@ class ExchangePointApiTests(APITestCase):
             self.assertEqual([point['id'] for point in response.data], [self.point.pk])
         self.assertEqual(self.client.get(self.url, {'exchange_format': 'points'}).data, [])
         self.assertEqual(self.client.get(self.url, {'exchange_format': 'unknown'}).status_code, 400)
+
+    def test_old_url_is_removed(self):
+        self.assertEqual(self.client.get('/api/v1/exchange-points').status_code, 404)
+
+
+class ExchangePointItemTypeTests(APITestCase):
+    url = '/api/v1/exchangePoints'
+
+    def setUp(self):
+        self.staff = get_user_model().objects.create_user(
+            email='staff@example.test', username='staff', password='Xk29-test-Qz', is_staff=True
+        )
+        self.shoes = ItemType.objects.get(title='Обувь')
+        self.books = ItemType.objects.get(title='Книги')
+        self.point = ExchangePoint.objects.create(
+            address=Address.objects.create(
+                city='Екатеринбург', street='Мира', building='19', location=Point(60.6522, 56.8440, srid=4326)
+            ),
+            title='Обувной пункт', status=ExchangePoint.Status.ACTIVE,
+        )
+        self.point.item_types.set([self.shoes])
+
+    def payload(self, **kwargs):
+        return {
+            'title': 'Книжный пункт',
+            'address': {'city': 'Екатеринбург', 'street': 'Ленина', 'building': '1', 'latitude': 56.84, 'longitude': 60.6},
+            **kwargs,
+        }
+
+    def test_response_contains_item_types(self):
+        response = self.client.get(f'{self.url}/{self.point.pk}')
+        self.assertEqual(response.data['item_types'], [{'id': self.shoes.pk, 'title': 'Обувь', 'description': ''}])
+        self.assertNotIn('item_type_ids', response.data)
+
+    def test_create_and_update_item_types(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.post(self.url, self.payload(item_type_ids=[self.books.pk, self.shoes.pk]), format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual({t['title'] for t in response.data['item_types']}, {'Книги', 'Обувь'})
+
+        detail = f'{self.url}/{response.data["id"]}'
+        response = self.client.patch(detail, {'item_type_ids': [self.books.pk]}, format='json')
+        self.assertEqual([t['title'] for t in response.data['item_types']], ['Книги'])
+        response = self.client.patch(detail, {'title': 'Без изменения типов'}, format='json')
+        self.assertEqual([t['title'] for t in response.data['item_types']], ['Книги'])
+
+    def test_unknown_item_type_is_rejected(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.post(self.url, self.payload(item_type_ids=[9999]), format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('item_type_ids', response.data)
+        self.assertFalse(ExchangePoint.objects.filter(title='Книжный пункт').exists())
+
+    def test_filter_by_item_type(self):
+        other = ExchangePoint.objects.create(
+            address=Address.objects.create(
+                city='Екатеринбург', street='Ленина', building='2', location=Point(60.6, 56.84, srid=4326)
+            ),
+            title='Универсальный пункт',
+        )
+        other.item_types.set([self.shoes, self.books])
+        ids = [point['id'] for point in self.client.get(self.url, {'item_type': self.shoes.pk}).data]
+        self.assertEqual(sorted(ids), sorted([self.point.pk, other.pk]))
+        ids = [point['id'] for point in self.client.get(self.url, {'item_type': self.books.pk}).data]
+        self.assertEqual(ids, [other.pk])
+        self.assertEqual(self.client.get(self.url, {'item_type': 'abc'}).status_code, 400)
+
+    def test_list_query_count_does_not_grow(self):
+        for number in range(5):
+            point = ExchangePoint.objects.create(
+                address=Address.objects.create(
+                    city='Екатеринбург', street='Ленина', building=str(number), location=Point(60.6, 56.84, srid=4326)
+                ),
+                title=f'Пункт {number}',
+            )
+            point.item_types.set([self.shoes, self.books])
+        with self.assertNumQueries(2):
+            self.client.get(self.url)
+
+
+class ExchangePointAdminTests(TestCase):
+    def test_admin_pages_open(self):
+        admin = get_user_model().objects.create_superuser(
+            email='admin@example.test', username='admin', password='Xk29-test-Qz'
+        )
+        self.client.force_login(admin)
+        for page in ['changelist', 'add']:
+            response = self.client.get(reverse(f'admin:exchange_points_exchangepoint_{page}'))
+            self.assertEqual(response.status_code, 200, page)
+
+
+class SeedExchangePointsTests(TestCase):
+    def seed(self):
+        call_command('seed_exchange_points', stdout=StringIO())
+
+    def test_creates_at_least_ten_active_points_with_full_info(self):
+        self.seed()
+        active = ExchangePoint.objects.filter(status=ExchangePoint.Status.ACTIVE)
+        self.assertGreaterEqual(active.count(), 10)
+        for point in ExchangePoint.objects.select_related('address').prefetch_related('item_types'):
+            self.assertTrue(point.address.street and point.address.building, point.title)
+            self.assertTrue(point.opening_hours, point.title)
+            self.assertTrue(point.phone and point.email, point.title)
+            self.assertTrue(point.formats, point.title)
+            self.assertTrue(point.item_types.exists(), point.title)
+
+    def test_points_are_in_yekaterinburg(self):
+        self.seed()
+        center = Point(60.6057, 56.8389, srid=4326)
+        far = ExchangePoint.objects.exclude(address__location__distance_lte=(center, D(km=20)))
+        self.assertFalse(far.exists())
+
+    def test_is_idempotent(self):
+        self.seed()
+        count = ExchangePoint.objects.count()
+        self.seed()
+        self.assertEqual(ExchangePoint.objects.count(), count)
+        self.assertEqual(Address.objects.count(), count)
+
+    def test_api_shows_seeded_points(self):
+        self.seed()
+        response = self.client.get('/api/v1/exchangePoints', {'status': 'active'})
+        self.assertGreaterEqual(len(response.data), 10)

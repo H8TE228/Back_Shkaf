@@ -57,6 +57,9 @@ class ExchangePoint(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='verified_exchange_points', verbose_name=_('verified by'),
     )
+    item_types = models.ManyToManyField(
+        'items.ItemType', related_name='exchange_points', blank=True, verbose_name=_('item types')
+    )
     picture = models.ImageField(_('picture'), upload_to='exchange_points/', blank=True)
     created_at = models.DateTimeField(_('creation date'), auto_now_add=True)
     updated_at = models.DateTimeField(_('last update date'), auto_now=True)

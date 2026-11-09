@@ -11,10 +11,11 @@ class ExchangePointFilter(django_filters.FilterSet):
     city = django_filters.CharFilter(field_name='address__city')
     district = django_filters.CharFilter(field_name='address__district')
     exchange_format = django_filters.ChoiceFilter(choices=ExchangePoint.Format.choices, method='filter_format')
+    item_type = django_filters.NumberFilter(field_name='item_types', distinct=True)
 
     class Meta:
         model = ExchangePoint
-        fields = ('city', 'district', 'status', 'exchange_format')
+        fields = ('city', 'district', 'status', 'exchange_format', 'item_type')
 
     def filter_format(self, queryset, name, value):
         return queryset.filter(formats__contains=[value])
@@ -22,7 +23,10 @@ class ExchangePointFilter(django_filters.FilterSet):
 
 @extend_schema(tags=['exchange-points'])
 class ExchangePointViewSet(viewsets.ModelViewSet):
-    queryset = ExchangePoint.objects.select_related('address').order_by('-created_at', '-id')
+    queryset = (
+        ExchangePoint.objects.select_related('address').prefetch_related('item_types')
+        .order_by('-created_at', '-id')
+    )
     serializer_class = ExchangePointSerializer
     parser_classes = (JSONParser,)
     http_method_names = ('get', 'post', 'patch', 'head', 'options')

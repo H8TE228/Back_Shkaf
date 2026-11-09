@@ -154,15 +154,22 @@ uv run python manage.py runserver
 | POST | `/items/{id}/photos` | Загрузка фото, `multipart/form-data`, поле `image` | Владелец |
 | DELETE | `/items/{id}/photos/{photo_id}` | Удаление фото | Владелец |
 | GET | `/itemTypes`, `/itemTypes/{id}` | Справочник типов вещей | Все |
-
-| GET | `/exchange-points`, `/exchange-points/{id}` | Каталог и карточка пункта обмена | Все |
-| POST | `/exchange-points` | Создание пункта с адресом | `is_staff` |
-| PATCH | `/exchange-points/{id}` | Изменение пункта и адреса | `is_staff` |
+| GET | `/exchangePoints`, `/exchangePoints/{id}` | Каталог и карточка пункта обмена | Все |
+| POST | `/exchangePoints` | Создание пункта с адресом | `is_staff` |
+| PATCH | `/exchangePoints/{id}` | Изменение пункта и адреса | `is_staff` |
 
 ### Пункты обмена
 
+Тестовые пункты в Екатеринбурге добавляет команда ниже: 10 активных, по одному в статусах `needs_check` и `closed`. Названия и контакты вымышлены, координаты приблизительные. Повторный запуск не создаёт дубли и не меняет уже существующие пункты.
+
+```bash
+docker compose exec web python manage.py seed_exchange_points
+```
+
+
 - В каталоге видны все статусы: `active`, `needs_check`, `closed`. По умолчанию новый пункт получает статус `needs_check`.
-- Фильтры: `city`, `district`, `status`, `exchange_format` (`free`, `points`, `charity`); `search` ищет по названию.
+- Фильтры: `city`, `district`, `status`, `exchange_format` (`free`, `points`, `charity`), `item_type` (id типа вещи); `search` ищет по названию.
+- `item_types` в ответе — типы вещей, которые принимает пункт. При создании и изменении они передаются списком id в `item_type_ids`.
 - При создании передаётся объект `address` с полями `city`, `street`, `building`, `latitude`, `longitude` и необязательными полями адреса. При изменении координат нужно передать обе координаты.
 - `opening_hours` — объект с днями `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`. Пустой объект означает неизвестное расписание, отсутствующий день — нет данных о нём, пустой список — выходной. Переданное при `PATCH` расписание заменяет прежнее целиком.
 - Интервалы записываются как `{"from": "10:00", "to": "18:00"}`. `24:00` допустимо только как время окончания; ночную работу нужно разделить между днями. Интервалы одного дня не должны пересекаться.

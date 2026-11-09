@@ -6,6 +6,9 @@ from django.contrib.gis.geos import Point
 from django.db import transaction
 from rest_framework import serializers
 
+from items.models import ItemType
+from items.serializers import ItemTypeSerializer
+
 from .models import Address, ExchangePoint
 
 
@@ -88,12 +91,18 @@ class ExchangePointSerializer(serializers.ModelSerializer):
     formats = serializers.ListField(
         child=serializers.ChoiceField(choices=ExchangePoint.Format.choices), required=False
     )
+    item_types = ItemTypeSerializer(many=True, read_only=True)
+    item_type_ids = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=ItemType.objects.all(), source='item_types', write_only=True, required=False,
+        help_text='Типы вещей, которые принимает пункт',
+    )
 
     class Meta:
         model = ExchangePoint
         fields = (
             'id', 'address', 'title', 'description', 'opening_hours', 'phone', 'email',
-            'website', 'formats', 'status', 'verified_at', 'verified_by', 'picture',
+            'website', 'formats', 'item_types', 'item_type_ids', 'status', 'verified_at', 'verified_by',
+            'picture',
             'created_at', 'updated_at',
         )
         read_only_fields = ('id', 'verified_at', 'verified_by', 'picture', 'created_at', 'updated_at')
@@ -106,8 +115,11 @@ class ExchangePointSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         address_data = validated_data.pop('address')
+        item_types = validated_data.pop('item_types', [])
         address = Address.objects.create(**address_data)
-        return ExchangePoint.objects.create(address=address, **validated_data)
+        point = ExchangePoint.objects.create(address=address, **validated_data)
+        point.item_types.set(item_types)
+        return point
 
     @transaction.atomic
     def update(self, instance, validated_data):
