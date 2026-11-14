@@ -3,6 +3,8 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import filters, permissions, viewsets
 from rest_framework.parsers import JSONParser
 
+from shkaf.filters import DistanceFilter
+
 from .models import ExchangePoint
 from .serializers import ExchangePointSerializer
 
@@ -30,7 +32,8 @@ class ExchangePointViewSet(viewsets.ModelViewSet):
     serializer_class = ExchangePointSerializer
     parser_classes = (JSONParser,)
     http_method_names = ('get', 'post', 'patch', 'head', 'options')
-    filter_backends = (django_filters.DjangoFilterBackend, filters.SearchFilter)
+    filter_backends = (django_filters.DjangoFilterBackend, filters.SearchFilter, DistanceFilter)
+    distance_field = 'address__location'
     filterset_class = ExchangePointFilter
     search_fields = ('title',)
     pagination_class = None

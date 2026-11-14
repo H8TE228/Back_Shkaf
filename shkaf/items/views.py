@@ -9,6 +9,8 @@ from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
+from shkaf.filters import DistanceFilter
+
 from .exceptions import StateConflict
 from .models import Item, ItemType
 from .permissions import IsOwnerOrReadOnly
@@ -35,7 +37,8 @@ def ensure_editable(item):
 
 class ItemFilterMixin:
     serializer_class = ItemSerializer
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, DistanceFilter, filters.OrderingFilter)
+    distance_field = 'approx_location'
     filterset_fields = ('item_type', 'exchange_format', 'condition', 'status', 'district')
     search_fields = ('title', 'description')
     ordering_fields = ('created_at', 'updated_at')

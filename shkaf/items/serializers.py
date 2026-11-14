@@ -1,5 +1,8 @@
 from rest_framework import serializers
 
+from shkaf.filters import DistanceSerializerMixin
+from shkaf.serializers import coordinates_to_point
+
 from .exceptions import StateConflict
 from .models import Item, ItemPhoto, ItemType
 
@@ -33,7 +36,14 @@ class ItemPhotoSerializer(serializers.ModelSerializer):
         return value
 
 
-class ItemSerializer(serializers.ModelSerializer):
+class ItemSerializer(DistanceSerializerMixin, serializers.ModelSerializer):
+    latitude = serializers.FloatField(
+        source='approx_location.y', required=False, allow_null=True, min_value=-90, max_value=90,
+        help_text='Сохраняется с округлением примерно до 500 м',
+    )
+    longitude = serializers.FloatField(
+        source='approx_location.x', required=False, allow_null=True, min_value=-180, max_value=180,
+    )
     owner_id = serializers.IntegerField(read_only=True)
     item_type_title = serializers.CharField(source='item_type.title', read_only=True)
     photos = ItemPhotoSerializer(many=True, read_only=True)
@@ -52,11 +62,17 @@ class ItemSerializer(serializers.ModelSerializer):
             'exchange_format',
             'status',
             'district',
+            'latitude',
+            'longitude',
+            'distance',
             'photos',
             'created_at',
             'updated_at',
         )
         read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def validate(self, attrs):
+        return coordinates_to_point(attrs, 'approx_location')
 
     def validate_status(self, value):
         if self.instance is None:
