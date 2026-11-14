@@ -40,6 +40,20 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 
+# WebSocket принимает подключения только с этих адресов: защита от подключения с чужого сайта
+WEBSOCKET_ALLOWED_ORIGINS = CORS_ALLOWED_ORIGINS + ['http://localhost:8000', 'http://127.0.0.1:8000']
+
+# Redis нужен, чтобы сообщения доходили между процессами. Без REDIS_URL слой работает в памяти одного процесса.
+REDIS_URL = os.getenv('REDIS_URL')
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {'hosts': [REDIS_URL]},
+    } if REDIS_URL else {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
+
 # Нужны только при запуске без Docker, если GDAL и GEOS не находятся автоматически
 GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH')
 GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH')
@@ -48,6 +62,8 @@ GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH')
 # Application definition
 
 INSTALLED_APPS = [
+    # daphne должен стоять первым: тогда runserver обслуживает и WebSocket
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -66,6 +82,7 @@ INSTALLED_APPS = [
     'users.apps.UsersConfig',
     'exchange_points.apps.ExchangePointsConfig',
     'items.apps.ItemsConfig',
+    'chat.apps.ChatConfig',
 ]
 
 MIDDLEWARE = [
@@ -97,6 +114,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'shkaf.wsgi.application'
+ASGI_APPLICATION = 'shkaf.asgi.application'
 
 
 # Database
@@ -184,6 +202,14 @@ AUTH_COOKIE_ACCESS_PATH = '/'
 AUTH_COOKIE_REFRESH_PATH = '/api/v1/users/'
 AUTH_COOKIE_SECURE = not DEBUG
 AUTH_COOKIE_SAMESITE = 'Lax'
+
+SPECTACULAR_SETTINGS = {
+    # У вещи и у пункта обмена разные наборы статусов: даём им разные имена в схеме
+    'ENUM_NAME_OVERRIDES': {
+        'ItemStatusEnum': 'items.models.Item.Status',
+        'ExchangePointStatusEnum': 'exchange_points.models.ExchangePoint.Status',
+    },
+}
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=600),

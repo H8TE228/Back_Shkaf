@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/v1/me/items', MyItemsView.as_view(), name='my_items'),
     path('api/v1/', include('exchange_points.urls')),
     path('api/v1/', include('items.urls')),
+    path('api/v1/', include('chat.urls')),
 ]
 
 if settings.DEBUG:
