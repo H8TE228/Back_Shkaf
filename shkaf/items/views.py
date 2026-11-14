@@ -2,7 +2,7 @@ from django.db import transaction
 from django.db.models import Max, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django_filters.rest_framework import DjangoFilterBackend
+from django_filters import rest_framework as django_filters
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import filters, generics, permissions, serializers, status, viewsets
 from rest_framework.decorators import action
@@ -10,6 +10,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
 from .exceptions import StateConflict
+from .filters import ItemFilter
 from .models import Item, ItemType
 from .permissions import IsOwnerOrReadOnly
 from .serializers import ItemPhotoSerializer, ItemSerializer, ItemTypeSerializer
@@ -35,8 +36,8 @@ def ensure_editable(item):
 
 class ItemFilterMixin:
     serializer_class = ItemSerializer
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
-    filterset_fields = ('item_type', 'exchange_format', 'condition', 'status', 'district')
+    filter_backends = (django_filters.DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filterset_class = ItemFilter
     search_fields = ('title', 'description')
     ordering_fields = ('created_at', 'updated_at')
 

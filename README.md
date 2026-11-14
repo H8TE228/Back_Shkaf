@@ -168,7 +168,8 @@ docker compose exec web python manage.py seed_exchange_points
 
 
 - В каталоге видны все статусы: `active`, `needs_check`, `closed`. По умолчанию новый пункт получает статус `needs_check`.
-- Фильтры: `city`, `district`, `status`, `exchange_format` (`free`, `points`, `charity`), `item_type` (id типа вещи); `search` ищет по названию.
+- Фильтры: `city`, `district`, `status`, `exchange_format` (`free`, `points`, `charity`), `item_type_id` (ID типа вещи), `item_type` (точное название без учёта регистра); `search` ищет по названию.
+- Если указаны оба фильтра типа вещи, пункт должен принимать тип с указанным ID и тип с указанным названием (они могут быть разными).
 - `item_types` в ответе — типы вещей, которые принимает пункт. При создании и изменении они передаются списком id в `item_type_ids`.
 - При создании передаётся объект `address` с полями `city`, `street`, `building`, `latitude`, `longitude` и необязательными полями адреса. При изменении координат нужно передать обе координаты.
 - `opening_hours` — объект с днями `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`. Пустой объект означает неизвестное расписание, отсутствующий день — нет данных о нём, пустой список — выходной. Переданное при `PATCH` расписание заменяет прежнее целиком.
@@ -177,7 +178,7 @@ docker compose exec web python manage.py seed_exchange_points
 
 ### Объявления
 
-- **Фильтры `/items` и `/me/items`:** `item_type`, `exchange_format`, `condition`, `status`, `district`.
+- **Фильтры `/items` и `/me/items`:** `item_type_id` (ID типа вещи), `item_type` (точное название без учёта регистра), `exchange_format`, `condition`, `status`, `district`. Если указаны оба фильтра типа, объявление должно соответствовать обоим.
 - **Поиск и сортировка:** `search` ищет по названию и описанию, `ordering` принимает `created_at`, `updated_at` и варианты с минусом. По умолчанию сначала новые.
 - **Каталог:** без `status` возвращает только активные объявления.
 - **Значения полей:** `condition`: `new`, `good`, `used`. `exchange_format`: `free`, `swap`, `points`. `status`: `draft`, `active`, `reserved`, `given`, `archived`.
