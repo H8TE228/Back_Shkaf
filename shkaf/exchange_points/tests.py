@@ -275,11 +275,19 @@ class ExchangePointItemTypeTests(APITestCase):
             title='Универсальный пункт',
         )
         other.item_types.set([self.shoes, self.books])
-        ids = [point['id'] for point in self.client.get(self.url, {'item_type': self.shoes.pk}).data]
+        ids = [point['id'] for point in self.client.get(self.url, {'item_type_id': self.shoes.pk}).data]
         self.assertEqual(sorted(ids), sorted([self.point.pk, other.pk]))
-        ids = [point['id'] for point in self.client.get(self.url, {'item_type': self.books.pk}).data]
+        ids = [point['id'] for point in self.client.get(self.url, {'item_type_id': self.books.pk}).data]
         self.assertEqual(ids, [other.pk])
-        self.assertEqual(self.client.get(self.url, {'item_type': 'abc'}).status_code, 400)
+        self.assertEqual(self.client.get(self.url, {'item_type_id': 'abc'}).status_code, 400)
+        self.assertEqual(self.client.get(self.url, {'item_type_id': '1.5'}).status_code, 400)
+        ids = [point['id'] for point in self.client.get(self.url, {'item_type': 'оБуВь'}).data]
+        self.assertEqual(sorted(ids), sorted([self.point.pk, other.pk]))
+        self.assertEqual(self.client.get(self.url, {'item_type': 'Несуществующий тип'}).data, [])
+        ids = [point['id'] for point in self.client.get(
+            self.url, {'item_type_id': self.shoes.pk, 'item_type': 'книги'}
+        ).data]
+        self.assertEqual(ids, [other.pk])
 
     def test_list_query_count_does_not_grow(self):
         for number in range(5):

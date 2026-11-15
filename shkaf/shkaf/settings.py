@@ -83,6 +83,7 @@ INSTALLED_APPS = [
     'exchange_points.apps.ExchangePointsConfig',
     'items.apps.ItemsConfig',
     'chat.apps.ChatConfig',
+    'bookmarks.apps.BookmarksConfig',
 ]
 
 MIDDLEWARE = [

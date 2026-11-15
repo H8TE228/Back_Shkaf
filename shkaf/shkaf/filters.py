@@ -1,13 +1,19 @@
 import math
 
+from django import forms
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
+from django_filters import rest_framework as django_filters
 from rest_framework import serializers
 from rest_framework.filters import BaseFilterBackend
 
 DEFAULT_RADIUS_KM = 5
 MAX_RADIUS_KM = 50
+
+
+class IntegerFilter(django_filters.NumberFilter):
+    field_class = forms.IntegerField
 
 
 class DistanceFilter(BaseFilterBackend):

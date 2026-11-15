@@ -168,11 +168,25 @@ class ItemReadTests(ItemApiTestCase):
     def test_filters_and_search(self):
         books = ItemType.objects.get(title='Книги')
         self.make_item(title='Роман', description='Классика', item_type=books, exchange_format='swap', district='Кировский')
-        self.assertEqual(self.titles(item_type=books.pk), {'Роман'})
+        self.assertEqual(self.titles(item_type_id=books.pk), {'Роман'})
+        self.assertEqual(self.titles(item_type='кНиГи'), {'Роман'})
         self.assertEqual(self.titles(exchange_format='swap'), {'Роман'})
         self.assertEqual(self.titles(district='Кировский'), {'Роман'})
         self.assertEqual(self.titles(search='классика'), {'Роман'})
         self.assertEqual(self.titles(search='активная'), {'Активная'})
+
+    def test_item_type_filters_on_public_and_my_items(self):
+        books = ItemType.objects.get(title='Книги')
+        self.make_item(title='Роман', item_type=books)
+        self.client.force_authenticate(self.owner)
+        for url in ('/api/v1/items', '/api/v1/me/items'):
+            self.assertEqual(self.titles(url, item_type_id=books.pk), {'Роман'})
+            self.assertEqual(self.titles(url, item_type='кНИги'), {'Роман'})
+            self.assertEqual(self.titles(url, item_type='Несуществующий тип'), set())
+            self.assertEqual(self.titles(url, item_type_id=books.pk, item_type='книги'), {'Роман'})
+            self.assertEqual(self.titles(url, item_type_id=books.pk, item_type='Обувь'), set())
+            self.assertEqual(self.client.get(url, {'item_type_id': 'abc'}).status_code, 400)
+            self.assertEqual(self.client.get(url, {'item_type_id': '1.5'}).status_code, 400)
 
     def test_invalid_filter_value(self):
         response = self.client.get('/api/v1/items', {'exchange_format': 'unknown'})

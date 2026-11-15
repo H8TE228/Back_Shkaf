@@ -5,22 +5,9 @@ from rest_framework.parsers import JSONParser
 
 from shkaf.filters import DistanceFilter
 
+from .filters import ExchangePointFilter
 from .models import ExchangePoint
 from .serializers import ExchangePointSerializer
-
-
-class ExchangePointFilter(django_filters.FilterSet):
-    city = django_filters.CharFilter(field_name='address__city')
-    district = django_filters.CharFilter(field_name='address__district')
-    exchange_format = django_filters.ChoiceFilter(choices=ExchangePoint.Format.choices, method='filter_format')
-    item_type = django_filters.NumberFilter(field_name='item_types', distinct=True)
-
-    class Meta:
-        model = ExchangePoint
-        fields = ('city', 'district', 'status', 'exchange_format', 'item_type')
-
-    def filter_format(self, queryset, name, value):
-        return queryset.filter(formats__contains=[value])
 
 
 @extend_schema(tags=['exchange-points'])

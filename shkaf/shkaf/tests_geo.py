@@ -80,6 +80,16 @@ class ItemDistanceSearchTests(GeoTestCase):
         response = self.client.get('/api/v1/me/items', {**CENTER, 'radius': 1})
         self.assertEqual([item['title'] for item in response.data], ['Близко'])
 
+    def test_distance_combines_with_item_type_filters(self):
+        for url in ('/api/v1/items', '/api/v1/me/items'):
+            self.client.force_authenticate(self.owner)
+            for params in ({'item_type_id': self.item_type.pk}, {'item_type': 'оБуВь'}):
+                response = self.client.get(url, {**CENTER, **params})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual([item['title'] for item in response.data], ['Близко', 'Средне'])
+            response = self.client.get(url, {**CENTER, 'item_type': 'Книги'})
+            self.assertEqual(response.data, [])
+
 
 class ItemCoordinatesTests(GeoTestCase):
     def setUp(self):
@@ -142,6 +152,16 @@ class ExchangePointDistanceSearchTests(GeoTestCase):
 
     def test_invalid_params(self):
         self.assertEqual(self.client.get('/api/v1/exchangePoints', {'lat': 56.8}).status_code, 400)
+
+    def test_distance_combines_with_item_type_filters(self):
+        for point in ExchangePoint.objects.all():
+            point.item_types.set([self.item_type])
+        for params in ({'item_type_id': self.item_type.pk}, {'item_type': 'оБуВь'}):
+            response = self.client.get('/api/v1/exchangePoints', {**CENTER, **params})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual([point['title'] for point in response.data], ['Близко', 'Средне'])
+        response = self.client.get('/api/v1/exchangePoints', {**CENTER, 'item_type': 'Книги'})
+        self.assertEqual(response.data, [])
 
     def test_without_geo_params_distance_is_null(self):
         response = self.client.get('/api/v1/exchangePoints')

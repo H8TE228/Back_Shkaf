@@ -1,8 +1,8 @@
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Max
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django_filters.rest_framework import DjangoFilterBackend
+from django_filters import rest_framework as django_filters
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import filters, generics, permissions, serializers, status, viewsets
 from rest_framework.decorators import action
@@ -12,22 +12,14 @@ from rest_framework.response import Response
 from shkaf.filters import DistanceFilter
 
 from .exceptions import StateConflict
+from .filters import ItemFilter
 from .models import Item, ItemType
 from .permissions import IsOwnerOrReadOnly
+from .querysets import existing_items, visible_items
 from .serializers import ItemPhotoSerializer, ItemSerializer, ItemTypeSerializer
 
 MAX_PHOTOS = 10
-PUBLIC_STATUSES = (Item.Status.ACTIVE, Item.Status.RESERVED, Item.Status.GIVEN)
 LOCKED_STATUSES = (Item.Status.RESERVED, Item.Status.GIVEN)
-
-
-def existing_items():
-    return (
-        Item.objects
-        .filter(deleted_at__isnull=True, owner__deleted_at__isnull=True)
-        .select_related('item_type')
-        .prefetch_related('photos')
-    )
 
 
 def ensure_editable(item):
@@ -37,9 +29,9 @@ def ensure_editable(item):
 
 class ItemFilterMixin:
     serializer_class = ItemSerializer
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, DistanceFilter, filters.OrderingFilter)
+    filter_backends = (django_filters.DjangoFilterBackend, filters.SearchFilter, DistanceFilter, filters.OrderingFilter)
     distance_field = 'approx_location'
-    filterset_fields = ('item_type', 'exchange_format', 'condition', 'status', 'district')
+    filterset_class = ItemFilter
     search_fields = ('title', 'description')
     ordering_fields = ('created_at', 'updated_at')
 
@@ -60,10 +52,7 @@ class ItemViewSet(ItemFilterMixin, viewsets.ModelViewSet):
     lookup_value_regex = '[0-9]+'
 
     def get_queryset(self):
-        visible = Q(status__in=PUBLIC_STATUSES)
-        if self.request.user.is_authenticated:
-            visible |= Q(owner=self.request.user)
-        items = existing_items().filter(visible)
+        items = visible_items(self.request.user)
         if self.action == 'list' and 'status' not in self.request.query_params:
             items = items.filter(status=Item.Status.ACTIVE)
         return items
