@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/v1/', include('exchange_points.urls')),
     path('api/v1/', include('items.urls')),
     path('api/v1/', include('chat.urls')),
+    path('api/v1/', include('bookmarks.urls')),
 ]
 
 if settings.DEBUG:

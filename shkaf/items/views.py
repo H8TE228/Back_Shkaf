@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Max
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django_filters import rest_framework as django_filters
@@ -15,20 +15,11 @@ from .exceptions import StateConflict
 from .filters import ItemFilter
 from .models import Item, ItemType
 from .permissions import IsOwnerOrReadOnly
+from .querysets import existing_items, visible_items
 from .serializers import ItemPhotoSerializer, ItemSerializer, ItemTypeSerializer
 
 MAX_PHOTOS = 10
-PUBLIC_STATUSES = (Item.Status.ACTIVE, Item.Status.RESERVED, Item.Status.GIVEN)
 LOCKED_STATUSES = (Item.Status.RESERVED, Item.Status.GIVEN)
-
-
-def existing_items():
-    return (
-        Item.objects
-        .filter(deleted_at__isnull=True, owner__deleted_at__isnull=True)
-        .select_related('item_type')
-        .prefetch_related('photos')
-    )
 
 
 def ensure_editable(item):
@@ -61,10 +52,7 @@ class ItemViewSet(ItemFilterMixin, viewsets.ModelViewSet):
     lookup_value_regex = '[0-9]+'
 
     def get_queryset(self):
-        visible = Q(status__in=PUBLIC_STATUSES)
-        if self.request.user.is_authenticated:
-            visible |= Q(owner=self.request.user)
-        items = existing_items().filter(visible)
+        items = visible_items(self.request.user)
         if self.action == 'list' and 'status' not in self.request.query_params:
             items = items.filter(status=Item.Status.ACTIVE)
         return items
