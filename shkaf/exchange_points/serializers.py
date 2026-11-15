@@ -8,6 +8,7 @@ from rest_framework import serializers
 
 from items.models import ItemType
 from items.serializers import ItemTypeSerializer
+from shkaf.filters import DistanceSerializerMixin
 
 from .models import Address, ExchangePoint
 
@@ -85,7 +86,7 @@ class OpeningHoursSerializer(serializers.Serializer):
         return attrs
 
 
-class ExchangePointSerializer(serializers.ModelSerializer):
+class ExchangePointSerializer(DistanceSerializerMixin, serializers.ModelSerializer):
     address = AddressSerializer()
     opening_hours = OpeningHoursSerializer(required=False)
     formats = serializers.ListField(
@@ -101,7 +102,7 @@ class ExchangePointSerializer(serializers.ModelSerializer):
         model = ExchangePoint
         fields = (
             'id', 'address', 'title', 'description', 'opening_hours', 'phone', 'email',
-            'website', 'formats', 'item_types', 'item_type_ids', 'status', 'verified_at', 'verified_by',
+            'website', 'formats', 'item_types', 'item_type_ids', 'status', 'distance', 'verified_at', 'verified_by',
             'picture',
             'created_at', 'updated_at',
         )
