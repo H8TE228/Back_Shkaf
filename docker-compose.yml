@@ -36,5 +36,21 @@ services:
       redis:
         condition: service_started
 
+  celery:
+    build: .
+    command: celery -A shkaf worker -l info
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
 volumes:
   db_data:
