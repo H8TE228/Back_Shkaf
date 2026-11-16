@@ -5,6 +5,7 @@ description = "Проект по созданию платформы обмен�
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "celery[redis]>=5.5",
     "channels>=4.2",
     "channels-redis>=4.2",
     "daphne>=4.1",

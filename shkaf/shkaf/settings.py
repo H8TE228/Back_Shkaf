@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -45,6 +46,7 @@ WEBSOCKET_ALLOWED_ORIGINS = CORS_ALLOWED_ORIGINS + ['http://localhost:8000', 'ht
 
 # Redis нужен, чтобы сообщения доходили между процессами. Без REDIS_URL слой работает в памяти одного процесса.
 REDIS_URL = os.getenv('REDIS_URL')
+TESTING = sys.argv[1:2] == ['test']
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
@@ -85,6 +87,7 @@ INSTALLED_APPS = [
     'chat.apps.ChatConfig',
     'exchanges.apps.ExchangesConfig',
     'reviews.apps.ReviewsConfig',
+    'notifications.apps.NotificationsConfig',
     'bookmarks.apps.BookmarksConfig',
 ]
 
@@ -205,6 +208,11 @@ AUTH_COOKIE_ACCESS_PATH = '/'
 AUTH_COOKIE_REFRESH_PATH = '/api/v1/users/'
 AUTH_COOKIE_SECURE = not DEBUG
 AUTH_COOKIE_SAMESITE = 'Lax'
+
+# Фоновые задачи (рассылка уведомлений по подпискам). Без Redis и в тестах задачи выполняются сразу.
+CELERY_BROKER_URL = REDIS_URL
+CELERY_TASK_ALWAYS_EAGER = TESTING or not REDIS_URL
+CELERY_TASK_IGNORE_RESULT = True
 
 SPECTACULAR_SETTINGS = {
     # У вещи и у пункта обмена разные наборы статусов: даём им разные имена в схеме

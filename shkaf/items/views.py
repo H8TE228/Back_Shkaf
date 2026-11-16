@@ -10,6 +10,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
 from exchanges.services import decline_open_requests
+from notifications.tasks import notify_subscribers
 from shkaf.filters import DistanceFilter
 
 from .exceptions import StateConflict
@@ -21,6 +22,11 @@ from .serializers import ItemPhotoSerializer, ItemSerializer, ItemTypeSerializer
 
 MAX_PHOTOS = 10
 LOCKED_STATUSES = (Item.Status.RESERVED, Item.Status.GIVEN)
+
+
+def announce_new_item(item):
+    """После записи в базу ставит в очередь рассылку по подпискам."""
+    transaction.on_commit(lambda: notify_subscribers.delay(item.pk))
 
 
 def ensure_editable(item):
@@ -59,12 +65,17 @@ class ItemViewSet(ItemFilterMixin, viewsets.ModelViewSet):
         return items
 
     def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
+        item = serializer.save(owner=self.request.user)
+        if item.status == Item.Status.ACTIVE:
+            announce_new_item(item)
 
     @transaction.atomic
     def perform_update(self, serializer):
         ensure_editable(serializer.instance)
+        was_draft = serializer.instance.status == Item.Status.DRAFT
         item = serializer.save()
+        if was_draft and item.status == Item.Status.ACTIVE:
+            announce_new_item(item)
         if item.status == Item.Status.ARCHIVED:
             decline_open_requests(item)
 

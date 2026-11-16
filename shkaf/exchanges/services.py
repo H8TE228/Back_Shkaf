@@ -9,6 +9,8 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from items.exceptions import StateConflict
 from items.models import Item
+from notifications.models import Notification
+from notifications.services import exchange_payload, notify
 
 from .models import Exchange
 
@@ -34,9 +36,11 @@ def request_exchange(item, receiver):
         raise StateConflict('The item is not available for exchange.')
     try:
         with transaction.atomic():
-            return Exchange.objects.create(item=item, giver_id=item.owner_id, receiver=receiver)
+            exchange = Exchange.objects.create(item=item, giver_id=item.owner_id, receiver=receiver)
     except IntegrityError:
         raise StateConflict('You already have an open request for this item.') from None
+    notify(exchange.giver_id, Notification.Type.EXCHANGE_REQUESTED, exchange_payload(exchange))
+    return exchange
 
 
 @transaction.atomic
@@ -54,6 +58,7 @@ def agree(exchange, user):
     except IntegrityError:
         raise StateConflict('The item is already reserved.') from None
     item.save(update_fields=['status', 'updated_at'])
+    notify(exchange.receiver_id, Notification.Type.EXCHANGE_AGREED, exchange_payload(exchange))
     return exchange
 
 
@@ -64,6 +69,7 @@ def decline(exchange, user):
         raise PermissionDenied('Only the giver can decline a request.')
     _apply(exchange.decline)
     exchange.save()
+    notify(exchange.receiver_id, Notification.Type.EXCHANGE_DECLINED, exchange_payload(exchange))
     return exchange
 
 
@@ -81,6 +87,8 @@ def cancel(exchange, user):
     if was_agreed and item.status == Item.Status.RESERVED:
         item.status = Item.Status.ACTIVE
         item.save(update_fields=['status', 'updated_at'])
+    other_side = exchange.receiver_id if role == 'giver' else exchange.giver_id
+    notify(other_side, Notification.Type.EXCHANGE_CANCELLED, exchange_payload(exchange))
     return exchange
 
 
@@ -102,12 +110,21 @@ def confirm(exchange, user):
         item.save(update_fields=['status', 'updated_at'])
         decline_open_requests(item, exclude=exchange)
     exchange.save()
+    if exchange.status == Exchange.Status.COMPLETED:
+        for user_id in (exchange.giver_id, exchange.receiver_id):
+            notify(user_id, Notification.Type.EXCHANGE_COMPLETED, exchange_payload(exchange))
     return exchange
 
 
 def decline_open_requests(item, exclude=None):
     """Отклоняет ожидающие заявки, когда вещь передана, ушла в архив или удалена."""
-    requests = Exchange.objects.filter(item=item, status=Exchange.Status.REQUESTED)
+    requests = Exchange.objects.filter(item=item, status=Exchange.Status.REQUESTED).select_related('item')
     if exclude is not None:
         requests = requests.exclude(pk=exclude.pk)
-    return requests.update(status=Exchange.Status.DECLINED, updated_at=timezone.now())
+    declined = list(requests)
+    Exchange.objects.filter(pk__in=[e.pk for e in declined]).update(
+        status=Exchange.Status.DECLINED, updated_at=timezone.now()
+    )
+    for exchange in declined:
+        notify(exchange.receiver_id, Notification.Type.EXCHANGE_DECLINED, exchange_payload(exchange))
+    return len(declined)

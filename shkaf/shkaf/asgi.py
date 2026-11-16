@@ -18,12 +18,13 @@ from channels.security.websocket import OriginValidator  # noqa: E402
 from django.conf import settings  # noqa: E402
 
 from chat.middleware import JwtCookieAuthMiddleware  # noqa: E402
-from chat.routing import websocket_urlpatterns  # noqa: E402
+from chat.routing import websocket_urlpatterns as chat_routes  # noqa: E402
+from notifications.routing import websocket_urlpatterns as notification_routes  # noqa: E402
 
 application = ProtocolTypeRouter({
     'http': django_asgi_app,
     'websocket': OriginValidator(
-        JwtCookieAuthMiddleware(URLRouter(websocket_urlpatterns)),
+        JwtCookieAuthMiddleware(URLRouter(chat_routes + notification_routes)),
         settings.WEBSOCKET_ALLOWED_ORIGINS,
     ),
 })

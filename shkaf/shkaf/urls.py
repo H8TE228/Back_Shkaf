@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/v1/', include('chat.urls')),
     path('api/v1/', include('exchanges.urls')),
     path('api/v1/', include('reviews.urls')),
+    path('api/v1/', include('notifications.urls')),
     path('api/v1/', include('bookmarks.urls')),
 ]
 
