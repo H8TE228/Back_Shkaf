@@ -84,6 +84,7 @@ INSTALLED_APPS = [
     'items.apps.ItemsConfig',
     'chat.apps.ChatConfig',
     'exchanges.apps.ExchangesConfig',
+    'reviews.apps.ReviewsConfig',
     'bookmarks.apps.BookmarksConfig',
 ]
 
