@@ -9,6 +9,7 @@ from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
+from exchanges.services import decline_open_requests
 from shkaf.filters import DistanceFilter
 
 from .exceptions import StateConflict
@@ -60,14 +61,19 @@ class ItemViewSet(ItemFilterMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 
+    @transaction.atomic
     def perform_update(self, serializer):
         ensure_editable(serializer.instance)
-        serializer.save()
+        item = serializer.save()
+        if item.status == Item.Status.ARCHIVED:
+            decline_open_requests(item)
 
+    @transaction.atomic
     def perform_destroy(self, instance):
         ensure_editable(instance)
         instance.deleted_at = timezone.now()
         instance.save()
+        decline_open_requests(instance)
 
     @extend_schema(
         request={'multipart/form-data': ItemPhotoSerializer},
