@@ -11,6 +11,7 @@ dependencies = [
     "django==5.2.18",
     "django-cors-headers>=4.6",
     "django-filter>=26.2",
+    "django-fsm-2>=4.0",
     "djangorestframework>=3.18.3",
     "djangorestframework-simplejwt>=5.5.1",
     "drf-spectacular>=0.30.0",

@@ -3,6 +3,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from items.models import Item
+from items.serializers import ItemBriefSerializer
 
 from .models import MAX_MESSAGE_LENGTH, Conversation, Message
 
@@ -24,23 +25,8 @@ class ParticipantSerializer(serializers.ModelSerializer):
         fields = ('id', 'username', 'first_name', 'last_name', 'avatar')
 
 
-class ConversationItemSerializer(serializers.ModelSerializer):
-    cover = serializers.SerializerMethodField(help_text='Первое фото объявления')
-
-    class Meta:
-        model = Item
-        fields = ('id', 'title', 'status', 'cover')
-
-    def get_cover(self, item) -> str | None:
-        photo = next(iter(item.photos.all()), None)
-        if photo is None:
-            return None
-        request = self.context.get('request')
-        return request.build_absolute_uri(photo.image.url) if request else photo.image.url
-
-
 class ConversationSerializer(serializers.ModelSerializer):
-    item = ConversationItemSerializer(read_only=True)
+    item = ItemBriefSerializer(read_only=True)
     item_id = serializers.PrimaryKeyRelatedField(
         queryset=Item.objects.filter(deleted_at__isnull=True), source='item', write_only=True
     )

@@ -36,6 +36,23 @@ class ItemPhotoSerializer(serializers.ModelSerializer):
         return value
 
 
+class ItemBriefSerializer(serializers.ModelSerializer):
+    """Краткая карточка вещи для диалогов и передач."""
+
+    cover = serializers.SerializerMethodField(help_text='Первое фото объявления')
+
+    class Meta:
+        model = Item
+        fields = ('id', 'title', 'status', 'cover')
+
+    def get_cover(self, item) -> str | None:
+        photo = next(iter(item.photos.all()), None)
+        if photo is None:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(photo.image.url) if request else photo.image.url
+
+
 class ItemSerializer(DistanceSerializerMixin, serializers.ModelSerializer):
     latitude = serializers.FloatField(
         source='approx_location.y', required=False, allow_null=True, min_value=-90, max_value=90,

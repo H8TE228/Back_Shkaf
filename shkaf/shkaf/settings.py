@@ -83,6 +83,7 @@ INSTALLED_APPS = [
     'exchange_points.apps.ExchangePointsConfig',
     'items.apps.ItemsConfig',
     'chat.apps.ChatConfig',
+    'exchanges.apps.ExchangesConfig',
     'bookmarks.apps.BookmarksConfig',
 ]
 
@@ -209,6 +210,7 @@ SPECTACULAR_SETTINGS = {
     'ENUM_NAME_OVERRIDES': {
         'ItemStatusEnum': 'items.models.Item.Status',
         'ExchangePointStatusEnum': 'exchange_points.models.ExchangePoint.Status',
+        'ExchangeStatusEnum': 'exchanges.models.Exchange.Status',
     },
 }
 
