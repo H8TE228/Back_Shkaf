@@ -1,4 +1,5 @@
 from django.contrib.auth.password_validation import validate_password
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -32,6 +33,27 @@ class UserSerializer(serializers.ModelSerializer):
             'updated_at',
         )
         read_only_fields = ('id', 'role', 'points_balance', 'created_at', 'updated_at',)
+
+
+class PublicUserRatingSerializer(serializers.Serializer):
+    average = serializers.FloatField(allow_null=True)
+    count = serializers.IntegerField()
+
+
+class PublicUserSerializer(serializers.ModelSerializer):
+    rating = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'first_name', 'avatar', 'city', 'created_at', 'rating')
+        read_only_fields = fields
+
+    @extend_schema_field(PublicUserRatingSerializer)
+    def get_rating(self, user):
+        return {
+            'average': None if user.rating_average is None else round(user.rating_average, 1),
+            'count': user.rating_count,
+        }
 
 
 class RegisterSerializer(serializers.ModelSerializer):

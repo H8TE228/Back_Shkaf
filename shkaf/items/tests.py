@@ -192,6 +192,47 @@ class ItemReadTests(ItemApiTestCase):
         response = self.client.get('/api/v1/items', {'exchange_format': 'unknown'})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_filter_by_owner(self):
+        self.make_item(title='Чужая', owner=self.other)
+        self.assertEqual(self.titles(owner_id=self.owner.pk), {'Активная'})
+        self.assertEqual(self.titles(owner_id=self.other.pk), {'Чужая'})
+        self.assertEqual(self.titles(owner_id=99999), set())
+        self.assertEqual(self.titles(owner_id=self.owner.pk, search='чужая'), set())
+        self.assertEqual(self.titles(owner_id=self.other.pk, item_type='Обувь'), {'Чужая'})
+
+    def test_owner_filter_respects_private_statuses(self):
+        for user in (None, self.other, self.owner):
+            self.client.force_authenticate(user)
+            for item_status, title in (('draft', 'Черновик'), ('archived', 'Архив')):
+                expected = {title} if user == self.owner else set()
+                self.assertEqual(self.titles(owner_id=self.owner.pk, status=item_status), expected)
+            self.assertEqual(self.titles(owner_id=self.owner.pk, status='reserved'), {'Резерв'})
+
+    def test_owner_filter_hides_deleted_items_and_users(self):
+        self.active.deleted_at = self.active.created_at
+        self.active.save()
+        self.assertEqual(self.titles(owner_id=self.owner.pk), set())
+        self.make_item(title='Другая активная')
+        self.owner.anonymize()
+        self.assertEqual(self.titles(owner_id=self.owner.pk), set())
+
+    def test_owner_filter_cannot_expand_my_items(self):
+        self.make_item(title='Чужая', owner=self.other)
+        self.client.force_authenticate(self.owner)
+        self.assertEqual(
+            self.titles('/api/v1/me/items', owner_id=self.owner.pk),
+            {'Активная', 'Черновик', 'Архив', 'Резерв'},
+        )
+        self.assertEqual(self.titles('/api/v1/me/items', owner_id=self.other.pk), set())
+
+    def test_owner_id_must_be_an_integer(self):
+        self.client.force_authenticate(self.owner)
+        for url in ('/api/v1/items', '/api/v1/me/items'):
+            for value in ('abc', '1.5'):
+                response = self.client.get(url, {'owner_id': value})
+                self.assertEqual(response.status_code, 400)
+                self.assertIn('owner_id', response.data)
+
     def test_ordering(self):
         self.make_item(title='Новая')
         titles = [item['title'] for item in self.client.get('/api/v1/items', {'ordering': 'created_at'}).data]

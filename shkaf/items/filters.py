@@ -8,8 +8,13 @@ from .models import Item
 
 
 class ItemFilter(django_filters.FilterSet):
+    owner_id = IntegerFilter(field_name='owner_id', method='filter_owner_id', help_text='ID владельца объявления')
     item_type_id = IntegerFilter(field_name='item_type_id', method='filter_item_type_id')
     item_type = django_filters.CharFilter(field_name='item_type__title', lookup_expr='iexact')
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def filter_owner_id(self, queryset, name, value):
+        return queryset.filter(**{name: value})
 
     @extend_schema_field(OpenApiTypes.INT)
     def filter_item_type_id(self, queryset, name, value):
@@ -17,4 +22,4 @@ class ItemFilter(django_filters.FilterSet):
 
     class Meta:
         model = Item
-        fields = ('item_type_id', 'item_type', 'exchange_format', 'condition', 'status', 'district')
+        fields = ('owner_id', 'item_type_id', 'item_type', 'exchange_format', 'condition', 'status', 'district')

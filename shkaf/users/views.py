@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db.models import Avg, Count
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -17,6 +18,7 @@ from .permissions import IsSelfOrAdmin
 from .serializers import (
     ChangePasswordSerializer,
     CustomTokenObtainPairSerializer,
+    PublicUserSerializer,
     RegisterSerializer,
     UserSerializer,
 )
@@ -100,11 +102,30 @@ class MeView(AccountDeletionMixin, generics.RetrieveUpdateDestroyAPIView):
         return self.request.user
 
 
-class UserDetailView(AccountDeletionMixin, generics.UpdateAPIView, generics.DestroyAPIView):
+class UserDetailView(AccountDeletionMixin, generics.RetrieveUpdateDestroyAPIView):
     queryset = User.objects.filter(deleted_at__isnull=True)
     serializer_class = UserSerializer
     permission_classes = (permissions.IsAuthenticated, IsSelfOrAdmin,)
-    http_method_names = ['patch', 'delete', 'head', 'options']
+    http_method_names = ('get', 'patch', 'delete', 'head', 'options')
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [permissions.AllowAny()]
+        return super().get_permissions()
+
+    def get_serializer_class(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return PublicUserSerializer
+        return super().get_serializer_class()
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.request.method in permissions.SAFE_METHODS:
+            return queryset.filter(is_active=True).annotate(
+                rating_average=Avg('received_reviews__rating'),
+                rating_count=Count('received_reviews'),
+            )
+        return queryset
 
 
 class ChangePasswordView(generics.UpdateAPIView):
