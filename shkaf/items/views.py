@@ -11,7 +11,8 @@ from rest_framework.response import Response
 
 from exchanges.services import decline_open_requests
 from notifications.tasks import notify_subscribers
-from shkaf.filters import DistanceFilter
+from shkaf.filters import DistanceFilter, StableOrderingFilter
+from shkaf.pagination import StandardPagination
 
 from .exceptions import StateConflict
 from .filters import ItemFilter
@@ -36,7 +37,8 @@ def ensure_editable(item):
 
 class ItemFilterMixin:
     serializer_class = ItemSerializer
-    filter_backends = (django_filters.DjangoFilterBackend, filters.SearchFilter, DistanceFilter, filters.OrderingFilter)
+    pagination_class = StandardPagination
+    filter_backends = (django_filters.DjangoFilterBackend, filters.SearchFilter, DistanceFilter, StableOrderingFilter)
     distance_field = 'approx_location'
     filterset_class = ItemFilter
     search_fields = ('title', 'description')

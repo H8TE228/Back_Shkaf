@@ -159,6 +159,34 @@ uv run python manage.py runserver
 | POST | `/exchangePoints` | Создание пункта с адресом | `is_staff` |
 | PATCH | `/exchangePoints/{id}` | Изменение пункта и адреса | `is_staff` |
 
+### Пагинация
+
+Следующие GET-списки принимают `page` (номер страницы, начиная с 1) и `page_size` (20 по умолчанию, максимум 100):
+
+- `/items`, `/me/items`, `/me/bookmarks`;
+- `/reviews`, `/exchanges`, `/items/{id}/exchanges`;
+- `/users/` (для staff), `/conversations`, `/me/notifications`.
+
+Например: `/items?owner_id=123&page=2&page_size=20`. Ответ теперь объект, а не массив:
+
+```json
+{
+  "count": 42,
+  "next": "http://localhost:8000/api/v1/items?owner_id=123&page=3&page_size=20",
+  "previous": "http://localhost:8000/api/v1/items?owner_id=123&page_size=20",
+  "results": []
+}
+```
+
+`count` — число объектов после фильтрации и проверки доступа; `results` — объекты текущей страницы
+(в примере их содержимое опущено). Ссылки сохраняют фильтры и сортировку, на границах равны `null`.
+Пустая выборка на первой странице возвращает `count: 0`, `results: []` и обе ссылки `null`.
+Несуществующая или некорректная страница возвращает 404. `page_size` свыше 100 ограничивается сотней;
+неположительный или нечисловой `page_size` заменяется значением по умолчанию.
+
+`/exchangePoints`, `/itemTypes`, `/me/subscriptions` и сообщения `/conversations/{id}/messages`
+по-прежнему возвращают массивы без пагинации. Ответы одиночных объектов и действий не меняются.
+
 ### Публичный профиль
 
 - `GET /users/{id}` доступен без авторизации и возвращает только `id`, `username`, `first_name`, `avatar`, `city`, `created_at` и `rating`.
@@ -177,7 +205,7 @@ uv run python manage.py runserver
 | POST, DELETE | `/items/{id}/bookmark` | Добавить объявление в избранное или убрать его |
 | POST, DELETE | `/exchangePoints/{id}/bookmark` | Добавить пункт в избранное или убрать его |
 
-- `GET /me/bookmarks` возвращает список записей с `id`, `created_at` и вложенными карточками `item` / `point`. Ровно одна карточка заполнена, другая равна `null`.
+- `GET /me/bookmarks` возвращает страницу записей в `results` с `id`, `created_at` и вложенными карточками `item` / `point`. Ровно одна карточка заполнена, другая равна `null`.
 - Фильтр `type=item` оставляет только объявления, `type=point` — только пункты. Неизвестное значение возвращает 400.
 - `POST` не требует тела: первое добавление возвращает 201, повторное — 200 с той же закладкой. Дубли не создаются.
 - `DELETE` всегда возвращает 204, даже если закладки или объекта уже нет. Чужие закладки не изменяются.

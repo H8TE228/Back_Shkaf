@@ -45,28 +45,28 @@ class ItemDistanceSearchTests(GeoTestCase):
     def test_default_radius_is_5_km_and_sorted_by_distance(self):
         response = self.search()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual([item['title'] for item in response.data], ['Близко', 'Средне'])
-        self.assertLess(response.data[0]['distance'], response.data[1]['distance'])
-        self.assertAlmostEqual(response.data[1]['distance'], 3000, delta=300)
+        self.assertEqual([item['title'] for item in response.data['results']], ['Близко', 'Средне'])
+        self.assertLess(response.data['results'][0]['distance'], response.data['results'][1]['distance'])
+        self.assertAlmostEqual(response.data['results'][1]['distance'], 3000, delta=300)
 
     def test_custom_radius(self):
-        self.assertEqual([i['title'] for i in self.search(radius=1).data], ['Близко'])
-        self.assertEqual([i['title'] for i in self.search(radius=20).data], ['Близко', 'Средне', 'Далеко'])
+        self.assertEqual([i['title'] for i in self.search(radius=1).data['results']], ['Близко'])
+        self.assertEqual([i['title'] for i in self.search(radius=20).data['results']], ['Близко', 'Средне', 'Далеко'])
 
     def test_ordering_param_overrides_distance_order(self):
-        titles = [item['title'] for item in self.search(radius=20, ordering='-created_at').data]
+        titles = [item['title'] for item in self.search(radius=20, ordering='-created_at').data['results']]
         self.assertEqual(titles, ['Средне', 'Близко', 'Далеко'])
 
     def test_combines_with_other_filters(self):
         self.middle.exchange_format = 'swap'
         self.middle.save()
         response = self.search(exchange_format='swap')
-        self.assertEqual([item['title'] for item in response.data], ['Средне'])
+        self.assertEqual([item['title'] for item in response.data['results']], ['Средне'])
 
     def test_without_geo_params_distance_is_null(self):
         response = self.client.get('/api/v1/items')
-        self.assertEqual(len(response.data), 4)
-        self.assertTrue(all(item['distance'] is None for item in response.data))
+        self.assertEqual(len(response.data['results']), 4)
+        self.assertTrue(all(item['distance'] is None for item in response.data['results']))
 
     def test_invalid_params(self):
         for params in [{'lat': 56.8}, {'lng': 60.6}, {'radius': 3}, {'lat': 'abc', 'lng': 60},
@@ -78,7 +78,7 @@ class ItemDistanceSearchTests(GeoTestCase):
     def test_my_items_support_distance(self):
         self.client.force_authenticate(self.owner)
         response = self.client.get('/api/v1/me/items', {**CENTER, 'radius': 1})
-        self.assertEqual([item['title'] for item in response.data], ['Близко'])
+        self.assertEqual([item['title'] for item in response.data['results']], ['Близко'])
 
     def test_distance_combines_with_item_type_filters(self):
         for url in ('/api/v1/items', '/api/v1/me/items'):
@@ -86,9 +86,9 @@ class ItemDistanceSearchTests(GeoTestCase):
             for params in ({'item_type_id': self.item_type.pk}, {'item_type': 'оБуВь'}):
                 response = self.client.get(url, {**CENTER, **params})
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual([item['title'] for item in response.data], ['Близко', 'Средне'])
+                self.assertEqual([item['title'] for item in response.data['results']], ['Близко', 'Средне'])
             response = self.client.get(url, {**CENTER, 'item_type': 'Книги'})
-            self.assertEqual(response.data, [])
+            self.assertEqual(response.data['results'], [])
 
 
 class ItemCoordinatesTests(GeoTestCase):

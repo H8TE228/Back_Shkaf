@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from items.querysets import visible_items
+from shkaf.pagination import StandardPagination
 
 from . import services
 from .models import Exchange
@@ -40,6 +41,7 @@ class ExchangeViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets
     """Мои передачи: где я отдаю вещь или получаю её. Видны только участникам."""
 
     serializer_class = ExchangeSerializer
+    pagination_class = StandardPagination
     permission_classes = (permissions.IsAuthenticated,)
     filter_backends = (django_filters.DjangoFilterBackend,)
     filterset_class = ExchangeFilter
@@ -87,6 +89,7 @@ class ItemExchangesView(generics.ListCreateAPIView):
     """
 
     serializer_class = ExchangeSerializer
+    pagination_class = StandardPagination
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_item(self):

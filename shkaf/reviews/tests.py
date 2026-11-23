@@ -111,10 +111,10 @@ class ReviewApiTests(APITestCase):
         self.review(self.receiver)
         self.review(self.giver, rating=4)
         self.client.force_authenticate(None)
-        self.assertEqual(len(self.client.get(self.url).data), 2)
-        about_giver = self.client.get(self.url, {'target_user': self.giver.pk}).data
+        self.assertEqual(len(self.client.get(self.url).data['results']), 2)
+        about_giver = self.client.get(self.url, {'target_user': self.giver.pk}).data['results']
         self.assertEqual([r['author']['id'] for r in about_giver], [self.receiver.pk])
-        by_giver = self.client.get(self.url, {'author': self.giver.pk}).data
+        by_giver = self.client.get(self.url, {'author': self.giver.pk}).data['results']
         self.assertEqual([r['rating'] for r in by_giver], [4])
 
     def test_rating_summary(self):
@@ -132,7 +132,7 @@ class ReviewApiTests(APITestCase):
             exchange = make_exchange(self.giver, self.receiver, title=f'Вещь {number}')
             self.review(self.receiver, exchange)
         self.client.force_authenticate(None)
-        with self.assertNumQueries(2):
+        with self.assertNumQueries(3):
             self.client.get(self.url)
 
 

@@ -137,7 +137,7 @@ class ItemReadTests(ItemApiTestCase):
         self.reserved = self.make_item(title='Резерв', status=Item.Status.RESERVED)
 
     def titles(self, url='/api/v1/items', **params):
-        return {item['title'] for item in self.client.get(url, params).data}
+        return {item['title'] for item in self.client.get(url, params).data['results']}
 
     def test_list_shows_only_active_by_default(self):
         self.assertEqual(self.titles(), {'Активная'})
@@ -235,15 +235,15 @@ class ItemReadTests(ItemApiTestCase):
 
     def test_ordering(self):
         self.make_item(title='Новая')
-        titles = [item['title'] for item in self.client.get('/api/v1/items', {'ordering': 'created_at'}).data]
+        titles = [item['title'] for item in self.client.get('/api/v1/items', {'ordering': 'created_at'}).data['results']]
         self.assertEqual(titles, ['Активная', 'Новая'])
-        titles = [item['title'] for item in self.client.get('/api/v1/items').data]
+        titles = [item['title'] for item in self.client.get('/api/v1/items').data['results']]
         self.assertEqual(titles, ['Новая', 'Активная'])
 
     def test_list_query_count_does_not_grow(self):
         for number in range(5):
             ItemPhoto.objects.create(item=self.make_item(), image='items/a.jpg', position=number)
-        with self.assertNumQueries(2):
+        with self.assertNumQueries(3):
             self.client.get('/api/v1/items')
 
     def test_items_of_deleted_user_are_hidden(self):

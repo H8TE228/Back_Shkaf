@@ -99,12 +99,12 @@ class ExchangeRequestTests(ExchangeApiTestCase):
         self.request_item(self.receiver)
         self.request_item(self.second)
         self.as_user(self.giver)
-        self.assertEqual(len(self.client.get(self.item_url).data), 2)
+        self.assertEqual(len(self.client.get(self.item_url).data['results']), 2)
         self.as_user(self.second)
-        data = self.client.get(self.item_url).data
+        data = self.client.get(self.item_url).data['results']
         self.assertEqual([e['receiver_id'] for e in data], [self.second.pk])
         self.as_user(self.stranger)
-        self.assertEqual(self.client.get(self.item_url).data, [])
+        self.assertEqual(self.client.get(self.item_url).data['results'], [])
 
 
 class ExchangeFlowTests(ExchangeApiTestCase):
@@ -205,10 +205,12 @@ class ExchangeFlowTests(ExchangeApiTestCase):
 
     def test_my_exchanges_with_role_filter(self):
         self.as_user(self.receiver)
-        self.assertEqual(len(self.client.get('/api/v1/exchanges', {'role': 'receiver'}).data), 1)
-        self.assertEqual(self.client.get('/api/v1/exchanges', {'role': 'giver'}).data, [])
+        self.assertEqual(len(self.client.get('/api/v1/exchanges', {'role': 'receiver'}).data['results']), 1)
+        self.assertEqual(self.client.get('/api/v1/exchanges', {'role': 'giver'}).data['results'], [])
         self.as_user(self.giver)
-        self.assertEqual(len(self.client.get('/api/v1/exchanges', {'role': 'giver', 'status': 'requested'}).data), 1)
+        self.assertEqual(
+            len(self.client.get('/api/v1/exchanges', {'role': 'giver', 'status': 'requested'}).data['results']), 1,
+        )
         self.assertEqual(self.client.get('/api/v1/exchanges', {'role': 'x'}).status_code, 400)
 
 

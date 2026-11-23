@@ -13,6 +13,8 @@ from rest_framework_simplejwt.token_blacklist.models import (
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from shkaf.pagination import StandardPagination
+
 from .authentication import clear_auth_cookies, set_auth_cookies
 from .permissions import IsSelfOrAdmin
 from .serializers import (
@@ -150,7 +152,8 @@ class ChangePasswordView(generics.UpdateAPIView):
     
 
 class UserListView(generics.ListAPIView):
-    queryset = User.objects.filter(deleted_at__isnull=True)
+    queryset = User.objects.filter(deleted_at__isnull=True).order_by('pk')
+    pagination_class = StandardPagination
     serializer_class = UserSerializer
     permission_classes = (permissions.IsAdminUser,)
 

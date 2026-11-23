@@ -7,6 +7,7 @@ from rest_framework.response import Response
 
 from exchange_points.models import ExchangePoint
 from items.querysets import visible_items
+from shkaf.pagination import StandardPagination
 
 from .filters import BookmarkFilter
 from .models import Bookmark
@@ -19,7 +20,7 @@ class MyBookmarksView(generics.ListAPIView):
     permission_classes = (permissions.IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filterset_class = BookmarkFilter
-    pagination_class = None
+    pagination_class = StandardPagination
 
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
