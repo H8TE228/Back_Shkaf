@@ -6,7 +6,7 @@ from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
 from django_filters import rest_framework as django_filters
 from rest_framework import serializers
-from rest_framework.filters import BaseFilterBackend
+from rest_framework.filters import BaseFilterBackend, OrderingFilter
 
 DEFAULT_RADIUS_KM = 5
 MAX_RADIUS_KM = 50
@@ -14,6 +14,14 @@ MAX_RADIUS_KM = 50
 
 class IntegerFilter(django_filters.NumberFilter):
     field_class = forms.IntegerField
+
+
+class StableOrderingFilter(OrderingFilter):
+    def get_ordering(self, request, queryset, view):
+        ordering = super().get_ordering(request, queryset, view)
+        if ordering and not any(field.lstrip('-') in ('pk', 'id') for field in ordering):
+            return [*ordering, '-pk' if ordering[0].startswith('-') else 'pk']
+        return ordering
 
 
 class DistanceFilter(BaseFilterBackend):

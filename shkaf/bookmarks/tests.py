@@ -89,15 +89,16 @@ class BookmarkApiTests(BookmarkTestCase):
         second = self.client.post(self.point_url).data
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual([bookmark['id'] for bookmark in response.data], [second['id'], first['id']])
-        self.assertEqual(set(response.data[0]), {'id', 'created_at', 'item', 'point'})
-        self.assertIsNone(response.data[0]['item'])
-        self.assertEqual(response.data[0]['point']['id'], self.point.pk)
-        self.assertEqual(response.data[0]['point']['address']['city'], 'Екатеринбург')
-        self.assertEqual(response.data[0]['point']['item_types'][0]['id'], self.item_type.pk)
-        self.assertIsNone(response.data[1]['point'])
-        self.assertEqual(response.data[1]['item']['id'], self.item.pk)
-        self.assertEqual(response.data[1]['item']['item_type_title'], 'Книги')
+        results = response.data['results']
+        self.assertEqual([bookmark['id'] for bookmark in results], [second['id'], first['id']])
+        self.assertEqual(set(results[0]), {'id', 'created_at', 'item', 'point'})
+        self.assertIsNone(results[0]['item'])
+        self.assertEqual(results[0]['point']['id'], self.point.pk)
+        self.assertEqual(results[0]['point']['address']['city'], 'Екатеринбург')
+        self.assertEqual(results[0]['point']['item_types'][0]['id'], self.item_type.pk)
+        self.assertIsNone(results[1]['point'])
+        self.assertEqual(results[1]['item']['id'], self.item.pk)
+        self.assertEqual(results[1]['item']['item_type_title'], 'Книги')
 
     def test_filter_by_type(self):
         self.client.post(self.item_url)
@@ -105,14 +106,14 @@ class BookmarkApiTests(BookmarkTestCase):
         for target_type in ('item', 'point'):
             response = self.client.get(self.list_url, {'type': target_type})
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(len(response.data), 1)
-            self.assertIsNotNone(response.data[0][target_type])
+            self.assertEqual(len(response.data['results']), 1)
+            self.assertIsNotNone(response.data['results'][0][target_type])
         self.assertEqual(self.client.get(self.list_url, {'type': 'unknown'}).status_code, 400)
 
     def test_only_current_users_bookmarks_are_visible_or_removed(self):
         other_item = Bookmark.objects.create(user=self.owner, item=self.item)
         other_point = Bookmark.objects.create(user=self.owner, point=self.point)
-        self.assertEqual(self.client.get(self.list_url).data, [])
+        self.assertEqual(self.client.get(self.list_url).data['results'], [])
         self.client.delete(self.item_url)
         self.client.delete(self.point_url)
         self.assertEqual(Bookmark.objects.count(), 2)
@@ -138,7 +139,7 @@ class BookmarkApiTests(BookmarkTestCase):
             self.item.status = item_status
             self.item.save()
             self.assertIn(self.client.post(self.item_url).status_code, (200, 201))
-            self.assertEqual(len(self.client.get(self.list_url).data), 1)
+            self.assertEqual(len(self.client.get(self.list_url).data['results']), 1)
 
     def test_foreign_drafts_and_archived_items_are_hidden(self):
         Bookmark.objects.create(user=self.user, item=self.item)
@@ -146,7 +147,7 @@ class BookmarkApiTests(BookmarkTestCase):
             self.item.status = item_status
             self.item.save()
             self.assertEqual(self.client.post(self.item_url).status_code, 404)
-            self.assertEqual(self.client.get(self.list_url).data, [])
+            self.assertEqual(self.client.get(self.list_url).data['results'], [])
         self.assertEqual(self.client.delete(self.item_url).status_code, 204)
         self.assertFalse(Bookmark.objects.exists())
 
@@ -156,13 +157,13 @@ class BookmarkApiTests(BookmarkTestCase):
             self.item.status = item_status
             self.item.save()
             self.assertIn(self.client.post(self.item_url).status_code, (200, 201))
-            self.assertEqual(len(self.client.get(self.list_url).data), 1)
+            self.assertEqual(len(self.client.get(self.list_url).data['results']), 1)
 
     def test_soft_deleted_item_is_hidden_but_bookmark_can_be_removed(self):
         self.client.post(self.item_url)
         self.item.deleted_at = timezone.now()
         self.item.save()
-        self.assertEqual(self.client.get(self.list_url).data, [])
+        self.assertEqual(self.client.get(self.list_url).data['results'], [])
         self.assertEqual(self.client.post(self.item_url).status_code, 404)
         self.assertEqual(self.client.delete(self.item_url).status_code, 204)
         self.assertFalse(Bookmark.objects.exists())
@@ -170,7 +171,7 @@ class BookmarkApiTests(BookmarkTestCase):
     def test_items_of_deleted_owner_are_hidden(self):
         self.client.post(self.item_url)
         self.owner.anonymize()
-        self.assertEqual(self.client.get(self.list_url).data, [])
+        self.assertEqual(self.client.get(self.list_url).data['results'], [])
         self.assertEqual(self.client.post(self.item_url).status_code, 404)
         self.assertEqual(self.client.delete(self.item_url).status_code, 204)
 
@@ -179,7 +180,7 @@ class BookmarkApiTests(BookmarkTestCase):
             self.point.status = point_status
             self.point.save()
             self.assertIn(self.client.post(self.point_url).status_code, (200, 201))
-            self.assertEqual(len(self.client.get(self.list_url).data), 1)
+            self.assertEqual(len(self.client.get(self.list_url).data['results']), 1)
 
     def test_list_query_count_does_not_grow(self):
         for number in range(5):
@@ -197,6 +198,6 @@ class BookmarkApiTests(BookmarkTestCase):
             )
             point.item_types.set([self.item_type])
             Bookmark.objects.create(user=self.user, point=point)
-        with self.assertNumQueries(3):
+        with self.assertNumQueries(4):
             response = self.client.get(self.list_url)
-        self.assertEqual(len(response.data), 10)
+        self.assertEqual(len(response.data['results']), 10)

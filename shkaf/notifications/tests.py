@@ -200,11 +200,11 @@ class NotificationApiTests(NotificationTestCase):
         self.client.force_authenticate(self.subscriber)
 
     def test_list_and_unread(self):
-        self.assertEqual(len(self.client.get(self.url).data), 3)
+        self.assertEqual(len(self.client.get(self.url).data['results']), 3)
         self.assertEqual(self.client.get(f'{self.url}/unread-count').data, {'count': 3})
-        first = self.client.get(self.url).data[0]['id']
+        first = self.client.get(self.url).data['results'][0]['id']
         self.assertIsNotNone(self.client.post(f'{self.url}/{first}/read').data['read_at'])
-        self.assertEqual(len(self.client.get(self.url, {'unread': 'true'}).data), 2)
+        self.assertEqual(len(self.client.get(self.url, {'unread': 'true'}).data['results']), 2)
         self.assertEqual(self.client.post(f'{self.url}/read-all').data, {'marked_read': 2})
         self.assertEqual(self.client.get(f'{self.url}/unread-count').data, {'count': 0})
 

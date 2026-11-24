@@ -11,6 +11,7 @@ def existing_items():
         .filter(deleted_at__isnull=True, owner__deleted_at__isnull=True)
         .select_related('item_type')
         .prefetch_related('photos')
+        .order_by('-created_at', '-pk')
     )
 
 

@@ -4,6 +4,8 @@ from rest_framework import mixins, permissions, serializers, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from shkaf.pagination import StandardPagination
+
 from .models import Notification, Subscription
 from .serializers import NotificationSerializer, SubscriptionSerializer
 
@@ -31,6 +33,7 @@ class NotificationViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """Мои уведомления, сначала новые. ?unread=true — только непрочитанные."""
 
     serializer_class = NotificationSerializer
+    pagination_class = StandardPagination
     permission_classes = (permissions.IsAuthenticated,)
     lookup_value_regex = '[0-9]+'
 

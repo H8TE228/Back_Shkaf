@@ -6,6 +6,8 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, viewsets
 from rest_framework.response import Response
 
+from shkaf.pagination import StandardPagination
+
 from .models import Review
 from .permissions import IsAuthorOrReadOnly
 from .serializers import RatingSerializer, ReviewSerializer
@@ -25,6 +27,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
     """Отзывы видны всем. Оставить отзыв может участник завершённой передачи, менять и удалять — только автор."""
 
     serializer_class = ReviewSerializer
+    pagination_class = StandardPagination
     permission_classes = (permissions.IsAuthenticatedOrReadOnly, IsAuthorOrReadOnly)
     filter_backends = (django_filters.DjangoFilterBackend,)
     filterset_class = ReviewFilter

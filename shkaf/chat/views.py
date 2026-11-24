@@ -6,6 +6,8 @@ from rest_framework import mixins, permissions, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from shkaf.pagination import StandardPagination
+
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 from .services import mark_read, send_message
@@ -43,6 +45,7 @@ class ConversationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins
 
     serializer_class = ConversationSerializer
     permission_classes = (permissions.IsAuthenticated,)
+    pagination_class = StandardPagination
     lookup_value_regex = '[0-9]+'
 
     def get_queryset(self):
@@ -51,8 +54,10 @@ class ConversationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins
         return conversations_for(self.request.user)
 
     def list(self, request, *args, **kwargs):
-        conversations = attach_last_messages(list(self.get_queryset()))
-        return Response(self.get_serializer(conversations, many=True).data)
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        conversations = attach_last_messages(page)
+        return self.get_paginated_response(self.get_serializer(conversations, many=True).data)
 
     def retrieve(self, request, *args, **kwargs):
         conversation = attach_last_messages([self.get_object()])[0]
@@ -80,7 +85,7 @@ class ConversationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins
 
     @extend_schema(methods=['GET'], responses=MessageSerializer(many=True))
     @extend_schema(methods=['POST'], request=MessageSerializer, responses={201: MessageSerializer})
-    @action(detail=True, methods=['get', 'post'])
+    @action(detail=True, methods=['get', 'post'], pagination_class=None)
     def messages(self, request, pk=None):
         """GET: сообщения по порядку. POST: отправка сообщения, оно же придёт участникам по WebSocket."""
         conversation = self.get_object()

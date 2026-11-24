@@ -5,6 +5,10 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from exchanges.models import Exchange
+from items.models import Item, ItemType
+from reviews.models import Review
+
 User = get_user_model()
 PASSWORD = 'Xk29-test-Qz'
 
@@ -260,6 +264,88 @@ class UserDetailTests(APITestCase):
     def test_user_list_is_admin_only(self):
         self.client.force_authenticate(self.user)
         self.assertEqual(self.client.get('/api/v1/users/').status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PublicUserTests(APITestCase):
+    def setUp(self):
+        self.user = make_user(
+            first_name='Анна', last_name='Иванова', city='Екатеринбург', district='Кировский',
+            phone_number='+79990000000', points_balance=100,
+        )
+        self.url = f'/api/v1/users/{self.user.pk}'
+
+    def test_profile_is_public_and_contains_only_public_fields(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(set(response.data), {
+            'id', 'username', 'first_name', 'avatar', 'city', 'created_at', 'rating',
+        })
+        self.assertEqual(response.data['id'], self.user.pk)
+        self.assertEqual(response.data['username'], self.user.username)
+        self.assertEqual(response.data['first_name'], 'Анна')
+        self.assertEqual(response.data['city'], 'Екатеринбург')
+        self.assertIsNone(response.data['avatar'])
+        self.assertEqual(response.data['rating'], {'average': None, 'count': 0})
+
+    def test_owner_and_staff_also_receive_only_public_fields(self):
+        staff = make_user(email='staff@example.test', username='staff', is_staff=True)
+        anonymous_data = self.client.get(self.url).data
+        for user in (self.user, staff):
+            self.client.force_authenticate(user)
+            self.assertEqual(self.client.get(self.url).data, anonymous_data)
+
+    def test_deleted_inactive_and_missing_users_return_404(self):
+        self.assertEqual(self.client.get('/api/v1/users/99999').status_code, 404)
+        self.user.is_active = False
+        self.user.save()
+        self.assertEqual(self.client.get(self.url).status_code, 404)
+        self.user.is_active = True
+        self.user.save()
+        self.user.anonymize()
+        self.assertEqual(self.client.get(self.url).status_code, 404)
+
+    def test_rating_matches_rating_endpoint_and_tracks_changes(self):
+        reviews = []
+        for number, rating in enumerate((5, 4, 4)):
+            author = make_user(email=f'author{number}@example.test', username=f'author{number}')
+            item = Item.objects.create(
+                owner=self.user, item_type=ItemType.objects.get(title='Книги'), title=f'Книга {number}',
+                condition='good', exchange_format='free', status='given',
+            )
+            exchange = Exchange.objects.create(
+                item=item, giver=self.user, receiver=author, status=Exchange.Status.COMPLETED,
+            )
+            reviews.append(Review.objects.create(
+                exchange=exchange, author=author, target_user=self.user, rating=rating,
+            ))
+        self.assertEqual(self.client.get(self.url).data['rating'], {'average': 4.3, 'count': 3})
+        rating = self.client.get(f'{self.url}/rating').data
+        self.assertEqual(
+            self.client.get(self.url).data['rating'],
+            {'average': rating['average'], 'count': rating['count']},
+        )
+        reviews[0].rating = 1
+        reviews[0].save()
+        self.assertEqual(self.client.get(self.url).data['rating'], {'average': 3.0, 'count': 3})
+        reviews[0].delete()
+        self.assertEqual(self.client.get(self.url).data['rating'], {'average': 4.0, 'count': 2})
+
+    def test_profile_is_loaded_in_one_query(self):
+        with self.assertNumQueries(1):
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_private_profile_is_still_available_through_me(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.get('/api/v1/me')
+        self.assertEqual(response.data['email'], self.user.email)
+        self.assertEqual(response.data['phone_number'], self.user.phone_number)
+        self.assertEqual(response.data['points_balance'], 100)
+
+    def test_profile_supports_head_but_not_put(self):
+        self.assertEqual(self.client.head(self.url).status_code, 200)
+        self.client.force_authenticate(self.user)
+        self.assertEqual(self.client.put(self.url, {}, format='json').status_code, 405)
 
 
 class UserModelTests(APITestCase):

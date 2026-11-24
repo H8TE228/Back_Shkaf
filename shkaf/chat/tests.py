@@ -103,7 +103,7 @@ class ConversationApiTests(APITestCase):
         conversation_id = self.start().data['id']
         detail = f'{self.url}/{conversation_id}'
         self.client.force_authenticate(self.stranger)
-        self.assertEqual(self.client.get(self.url).data, [])
+        self.assertEqual(self.client.get(self.url).data['results'], [])
         self.assertEqual(self.client.get(detail).status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(self.client.get(f'{detail}/messages').status_code, status.HTTP_404_NOT_FOUND)
         response = self.client.post(f'{detail}/messages', {'body': 'Привет'}, format='json')
@@ -136,7 +136,7 @@ class ConversationApiTests(APITestCase):
 
         self.assertEqual(self.client.get(detail).data['unread_count'], 0)
         self.client.force_authenticate(self.owner)
-        data = self.client.get(self.url).data[0]
+        data = self.client.get(self.url).data['results'][0]
         self.assertEqual(data['unread_count'], 2)
         self.assertEqual(data['last_message']['body'], 'Второе')
 
@@ -151,7 +151,7 @@ class ConversationApiTests(APITestCase):
         first = self.start().data['id']
         second = self.start(item=make_item(self.owner, title='Книга')).data['id']
         self.client.post(f'{self.url}/{first}/messages', {'body': 'Свежее'}, format='json')
-        self.assertEqual([c['id'] for c in self.client.get(self.url).data], [first, second])
+        self.assertEqual([c['id'] for c in self.client.get(self.url).data['results']], [first, second])
 
     def test_item_cover_in_conversation(self):
         ItemPhoto.objects.create(item=self.item, image='items/cover.jpg', position=0)
@@ -162,7 +162,7 @@ class ConversationApiTests(APITestCase):
         for number in range(4):
             conversation_id = self.start(item=make_item(self.owner, title=f'Вещь {number}')).data['id']
             self.client.post(f'{self.url}/{conversation_id}/messages', {'body': 'Привет'}, format='json')
-        with self.assertNumQueries(3):
+        with self.assertNumQueries(4):
             self.client.get(self.url)
 
     def test_works_with_cookie_login(self):
