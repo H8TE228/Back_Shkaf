@@ -89,6 +89,8 @@ INSTALLED_APPS = [
     'reviews.apps.ReviewsConfig',
     'notifications.apps.NotificationsConfig',
     'bookmarks.apps.BookmarksConfig',
+    'info',
+    'organizer',
 ]
 
 MIDDLEWARE = [
