@@ -5,6 +5,7 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from items.views import MyItemsView
+from users.eco import EcoStatsView
 from users.views import ChangePasswordView, MeView
 
 urlpatterns = [
@@ -17,6 +18,7 @@ urlpatterns = [
     path('api/v1/me', MeView.as_view(), name='me'),
     path('api/v1/me/change-password', ChangePasswordView.as_view(), name='change_password'),
     path('api/v1/me/items', MyItemsView.as_view(), name='my_items'),
+    path('api/v1/me/eco-stats', EcoStatsView.as_view(), name='eco-stats'),
     path('api/v1/', include('exchange_points.urls')),
     path('api/v1/', include('items.urls')),
     path('api/v1/', include('chat.urls')),
@@ -24,6 +26,8 @@ urlpatterns = [
     path('api/v1/', include('reviews.urls')),
     path('api/v1/', include('notifications.urls')),
     path('api/v1/', include('bookmarks.urls')),
+    path('api/v1/', include('info.urls')),
+    path('api/v1/', include('organizer.urls')),
 ]
 
 if settings.DEBUG:
